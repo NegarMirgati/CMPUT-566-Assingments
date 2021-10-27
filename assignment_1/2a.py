@@ -53,8 +53,10 @@ def train(X_train, y_train, X_val, y_val, MaxIter, batch_size, alpha):
 
             # TODO: Your code here
             # Mini-batch gradient descent
-            w = w - (1 / batch_size) * alpha * (X_batch.T.dot((y_hat_batch - y_batch)))
+            gradient = (X_batch.T.dot(y_hat_batch - y_batch)) / batch_size
+            w = w - alpha * gradient
 
+        # 1. Compute the training loss by averaging loss_this_epoch
         avg_training_loss = loss_this_epoch / num_batches
 
         # 2. Perform validation on the validation test by the risk

@@ -11,20 +11,29 @@ def predict(X, w):
     return y_hat
 
 
-# TODO needs normalized inputs
+# needs normalized inputs
 def calculate_loss(normalized_y_hat, normalized_y):
     M = normalized_y_hat.shape[0]
     loss = (1 / (2 * M)) * np.sum(np.power((normalized_y_hat - normalized_y), 2))
     return loss
 
 
+# data should be denormalized for this function
 def calculate_risk(original_y_hat, original_y):
     M = original_y.shape[0]
     risk = (1 / M) * np.sum(abs(original_y_hat - original_y))
     return risk
 
 
-def train(X_train, y_train, X_val, y_val, MaxIter, batch_size, alpha):
+def denormalize_data(normalized_data, data_mean, data_std):
+    temp = normalized_data * data_std
+    return temp + data_mean
+
+
+def train(training_info, X_val, y_val, MaxIter, batch_size, alpha):
+    X_train = training_info["X_train"]
+    y_train = training_info["y_train"]
+
     N_train = X_train.shape[0]
     # N_val = X_val.shape[0]
 
@@ -61,7 +70,16 @@ def train(X_train, y_train, X_val, y_val, MaxIter, batch_size, alpha):
 
         # 2. Perform validation on the validation test by the risk
         y_hat_validation = predict(X_val, w)
-        validation_risk = calculate_risk(y_hat_validation, y_val)
+        # denormalize y_hat and y_test to calculate risks
+        mean_y = training_info["mean_y"]
+        std_y = training_info["std_y"]
+        denormalized_y_hat_validation = denormalize_data(
+            y_hat_validation, mean_y, std_y
+        )
+        denormalized_y_val = denormalize_data(y_val, mean_y, std_y)
+        validation_risk = calculate_risk(
+            denormalized_y_hat_validation, denormalized_y_val
+        )
 
         # 3. Keep track of the best validation epoch, risk, and the weights
         risks_val.append(validation_risk)
@@ -75,9 +93,13 @@ def train(X_train, y_train, X_val, y_val, MaxIter, batch_size, alpha):
     return epoch_best, w_best, risk_best, risks_val, losses_train
 
 
-def test(X_test, y_test, w):
+def test(X_test, y_test, w, y_mean, y_std):
     y_hat_test = predict(X_test, w)
-    risk = calculate_risk(y_hat_test, y_test)
+    denormalized_y_test = denormalize_data(y_test, y_mean, y_std)
+    denormalized_y_hat_test = denormalize_data(y_hat_test, y_mean, y_std)
+    risk = calculate_risk(denormalized_y_hat_test, denormalized_y_test)
+    loss = calculate_loss(y_hat_test, y_test)
+    print("test loss: ", loss)
     return risk
 
 
@@ -90,8 +112,9 @@ def main():
     y = y.reshape([-1, 1])
     # X: sample x dimension
     # y: sample x 1
-
-    X = (X - np.mean(X, axis=0)) / np.std(X, axis=0)
+    mean_x = np.mean(X, axis=0)
+    std_x = np.std(X, axis=0)
+    X = (X - mean_x) / std_x
 
     # Augment feature
     X_ = np.concatenate((np.ones([X.shape[0], 1]), X), axis=1)
@@ -127,22 +150,28 @@ def main():
     MaxIter = 100  # Maximum iteration
 
     # TODO: Your code here
+    traning_info = {
+        "X_train": X_train,
+        "y_train": y_train,
+        "mean_y": mean_y,
+        "std_y": std_y,
+    }
     epoch_best, w_best, risk_best, risks_val, losses_train = train(
-        X_train, y_train, X_val, y_val, MaxIter, batch_size, alpha
+        traning_info, X_val, y_val, MaxIter, batch_size, alpha
     )
     print("best epoch: ", epoch_best, "best w: ", w_best, "best risk: ", risk_best)
     plt.figure()
     plt.xlabel("epoch")
     plt.ylabel("validation risk")
     plt.plot(risks_val, color="red")
-    plt.savefig("risks_over_epoches")
+    plt.savefig("2a_risks_over_epoches")
     plt.figure()
     plt.xlabel("epoch")
     plt.ylabel("training loss")
     plt.plot(losses_train, color="blue")
-    plt.savefig("traning_loss_over_epoches")
+    plt.savefig("2a_traning_loss_over_epoches")
 
-    test_risk = test(X_test, y_test, w_best)
+    test_risk = test(X_test, y_test, w_best, mean_y, std_y)
     print("test risk: ", test_risk)
 
     # Perform test by the weights yielding the best validation performance
